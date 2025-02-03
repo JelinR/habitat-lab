@@ -59,12 +59,12 @@ from habitat_sim.sim import SimulatorBackend
 from habitat_sim.utils.common import quat_from_magnum
 
 if TYPE_CHECKING:
-    from omegaconf import DictConfig
+    from habitat.config.default_structured_configs import SimulatorConfig
 
 
 @registry.register_simulator(name="RearrangeSim-v0")
 class RearrangeSim(HabitatSim):
-    def __init__(self, config: "DictConfig"):
+    def __init__(self, config: "SimulatorConfig"):
         if len(config.agents) > 1:
             with read_write(config):
                 for agent_name, agent_cfg in config.agents.items():
@@ -84,7 +84,6 @@ class RearrangeSim(HabitatSim):
 
         self.first_setup = True
         self.ep_info: Optional[RearrangeEpisode] = None
-        self.prev_loaded_navmesh = None
         self.prev_scene_id: Optional[str] = None
 
         # Number of physics updates per action
@@ -114,7 +113,6 @@ class RearrangeSim(HabitatSim):
         self._viz_templates: Dict[str, Any] = {}
         self._viz_handle_to_template: Dict[str, float] = {}
         self._viz_objs: Dict[str, Any] = {}
-        self._draw_bb_objs: List[int] = []
 
         self.agents_mgr = ArticulatedAgentManager(self.habitat_config, self)
 
@@ -136,9 +134,6 @@ class RearrangeSim(HabitatSim):
         self._step_physics = self.habitat_config.step_physics
         self._auto_sleep = self.habitat_config.auto_sleep
         self._load_objs = self.habitat_config.load_objs
-        self._additional_object_paths = (
-            self.habitat_config.additional_object_paths
-        )
         self._kinematic_mode = self.habitat_config.kinematic_mode
         # KRM manages child/parent relationships in kinematic mode. Initialized in reconfigure if applicable.
         self.kinematic_relationship_manager: KinematicRelationshipManager = (
@@ -160,6 +155,10 @@ class RearrangeSim(HabitatSim):
 
     @property
     def receptacles(self) -> Dict[str, Receptacle]:
+        """
+        Returns a map of all receptacles in the current scene.
+        The key is the unique name associated to the receptacle.
+        """
         return self._receptacles
 
     @property
@@ -168,15 +167,6 @@ class RearrangeSim(HabitatSim):
         Maps a handle name to the relative position of an object in `self._scene_obj_ids`.
         """
         return self._handle_to_object_id
-
-    @property
-    def draw_bb_objs(self) -> List[int]:
-        """
-        Simulator object indices of objects to draw bounding boxes around if
-        debug render is enabled. By default, this is populated with all target
-        objects.
-        """
-        return self._draw_bb_objs
 
     @property
     def scene_obj_ids(self) -> List[int]:
@@ -295,7 +285,9 @@ class RearrangeSim(HabitatSim):
             self._sleep_all_objects()
 
     @add_perf_timing_func()
-    def reconfigure(self, config: "DictConfig", ep_info: RearrangeEpisode):
+    def reconfigure(
+        self, config: "SimulatorConfig", ep_info: RearrangeEpisode
+    ):
         self._handle_to_goal_name = ep_info.info["object_labels"]
 
         self.ep_info = ep_info
@@ -319,7 +311,7 @@ class RearrangeSim(HabitatSim):
             # delete old KRM when scene is hard reset
             self.kinematic_relationship_manager = None
             with read_write(config):
-                config["scene"] = ep_info.scene_id
+                config.scene = ep_info.scene_id
             t_start = time.time()
             super().reconfigure(config, should_close_on_new_scene=False)
             self.add_perf_timing("super_reconfigure", t_start)
@@ -386,11 +378,6 @@ class RearrangeSim(HabitatSim):
             ]
         )
 
-        self._draw_bb_objs = [
-            rom.get_object_by_handle(obj_handle).object_id
-            for obj_handle in self._targets
-        ]
-
         if self.first_setup:
             self.first_setup = False
             self.agents_mgr.first_setup()
@@ -440,13 +427,14 @@ class RearrangeSim(HabitatSim):
         articulated_agent = self.get_agent_data(agent_idx).articulated_agent
 
         for _attempt_i in range(max_attempts):
-            start_pos = self.pathfinder.get_random_navigable_point(
-                island_index=self._largest_indoor_island_idx
+            start_pos = np.array(
+                self.pathfinder.get_random_navigable_point(
+                    island_index=self._largest_indoor_island_idx
+                )
             )
 
             start_pos = self.safe_snap_point(start_pos)
             start_rot = np.random.uniform(0, 2 * np.pi)
-
             if filter_func is not None and not filter_func(
                 start_pos, start_rot
             ):
@@ -565,7 +553,7 @@ class RearrangeSim(HabitatSim):
     def safe_snap_point(self, pos: np.ndarray) -> np.ndarray:
         """
         Returns the 3D coordinates corresponding to a point belonging
-        to the biggest navmesh island in the scenee and closest to pos.
+        to the biggest navmesh island in the scene and closest to pos.
         When that point returns NaN, computes a navigable point at increasing
         distances to it.
         """
@@ -593,7 +581,7 @@ class RearrangeSim(HabitatSim):
             new_pos[0]
         ), f"The snap position is NaN. scene_id: {self.ep_info.scene_id}, new position: {new_pos}, original position: {pos}"
 
-        return new_pos
+        return np.array(new_pos)
 
     @add_perf_timing_func()
     def _add_objs(
@@ -749,10 +737,6 @@ class RearrangeSim(HabitatSim):
         rom = self.get_rigid_object_manager()
         obj_attr_mgr = self.get_object_template_manager()
 
-        # Enable BB render for the debug render call.
-        for obj_id in self._draw_bb_objs:
-            self.set_object_bb_draw(True, obj_id)
-
         if self._debug_render_goal:
             for target_handle, transform in self._targets.items():
                 # Visualize the goal of the object
@@ -767,7 +751,6 @@ class RearrangeSim(HabitatSim):
                 ro = rom.add_object_by_template_handle(
                     list(matching_templates.keys())[0]
                 )
-                self.set_object_bb_draw(True, ro.object_id)
                 ro.transformation = transform
                 make_render_only(ro, self)
                 ro_global_bb = habitat_sim.geo.get_transformed_bb(
@@ -912,10 +895,6 @@ class RearrangeSim(HabitatSim):
                 self.agents_mgr.update_debug()
             rom = self.get_rigid_object_manager()
             self._try_acquire_context()
-
-            # Disable BB drawing for observation render
-            for obj_id in self._draw_bb_objs:
-                self.set_object_bb_draw(False, obj_id)
 
             # Remove viz objects
             for obj in self._viz_objs.values():
