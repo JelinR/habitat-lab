@@ -12,6 +12,20 @@ if TYPE_CHECKING:
     from omegaconf import Container
 
 
+'''
+This function temporarily unlocks an OmegaConf configuration object so it can be modified within a with statement. 
+When the with block ends, it restores the original settings.
+
+OmegaConf objects can be immutable (readonly=True) and strict (struct=True), meaning:
+
+    You cannot modify values if readonly=True.
+    You cannot add new keys if struct=True.
+
+This function temporarily disables these restrictions, allowing modifications.
+
+'''
+
+
 @contextmanager
 def read_write(config: "Container") -> Generator[Node, None, None]:
     r"""

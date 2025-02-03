@@ -93,6 +93,8 @@ __all__ = [
     "RuntimePerfStatsMeasurementConfig",
 ]
 
+#TODO: cfg_3 : These dataclasses define the default values for the configurations.  The configs are grouped into hierarchical classes, 
+# which are then saved into the ConfigStore so that the configs can be loaded by Hydra.
 
 @dataclass
 class HabitatBaseConfig:
@@ -2710,7 +2712,9 @@ from hydra.core.config_search_path import ConfigSearchPath
 from hydra.core.plugins import Plugins
 from hydra.plugins.search_path_plugin import SearchPathPlugin
 
-
+#Extends the Hydra SearchPath by adding the provided path to the end
+#This ensures that Habitat's configs are loaded
+#Ref: https://github.com/facebookresearch/hydra/blob/main/examples/plugins/example_searchpath_plugin/hydra_plugins/example_searchpath_plugin/example_searchpath_plugin.py
 class HabitatConfigPlugin(SearchPathPlugin):
     def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
         search_path.append(

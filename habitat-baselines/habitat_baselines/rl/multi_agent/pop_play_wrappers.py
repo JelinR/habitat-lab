@@ -198,7 +198,7 @@ class MultiPolicy(Policy):
                 )
             )
         policy_info = _merge_list_dict(
-            [ac.policy_info for ac in agent_actions]
+            [ac.policy_info for ac in agent_actions]    #Each agent action (ac) should have its corresponding policy info
         )
         batch_size = masks.shape[0]
         device = masks.device

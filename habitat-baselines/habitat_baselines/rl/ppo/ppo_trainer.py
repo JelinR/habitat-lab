@@ -113,6 +113,7 @@ class PPOTrainer(BaseRLTrainer):
             self._env_spec.observation_space, self.obs_transforms
         )
 
+
     def _create_agent(self, resume_state, **kwargs) -> AgentAccessMgr:
         """
         Sets up the AgentAccessMgr. You still must call `agent.post_init` after

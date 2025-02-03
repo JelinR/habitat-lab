@@ -25,6 +25,7 @@ from typing import Optional
 from habitat.core.registry import Registry
 
 
+
 class BaselineRegistry(Registry):
     @classmethod
     def register_trainer(cls, to_register=None, *, name: Optional[str] = None):

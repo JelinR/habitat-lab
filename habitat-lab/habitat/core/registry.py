@@ -51,6 +51,7 @@ class Registry(metaclass=Singleton):
         name: Optional[str],
         assert_type: Optional[Type] = None,
     ) -> Callable:
+        
         def wrap(to_register):
             if assert_type is not None:
                 assert issubclass(

@@ -19,7 +19,7 @@ from habitat.config.default_structured_configs import (
 )
 from habitat.config.read_write import read_write
 
-_HABITAT_CFG_DIR = osp.dirname(inspect.getabsfile(inspect.currentframe()))
+_HABITAT_CFG_DIR = osp.dirname(inspect.getabsfile(inspect.currentframe()))  #TODO: cfg_0 : Defines the current habitat config dir
 # Habitat config directory inside the installed package.
 # Used to access default predefined configs.
 # This is equivalent to doing osp.dirname(osp.abspath(__file__))
@@ -113,7 +113,7 @@ def register_configs():
 def get_config(
     config_path: str,
     overrides: Optional[List[str]] = None,
-    configs_dir: str = _HABITAT_CFG_DIR,
+    configs_dir: str = _HABITAT_CFG_DIR,        #Initialize the main directory to be the current config dir
 ) -> DictConfig:
     r"""Returns habitat config object composed of configs from yaml file (config_path) and overrides.
 
@@ -122,8 +122,19 @@ def get_config(
     :param configs_dir: path to the config files root directory (defaults to :ref:`_HABITAT_CFG_DIR`).
     :return: composed config object.
     """
-    register_configs()
+
+    #TODO: cfg_1: Registers the Habitat config path (current) to the hydra search paths
+    #This ensures that habitat's configs are loaded globally (and not just in this function call)
+    register_configs()                        
+
+
+    #TODO: cfg_2 : Get specific config file from the config directory, in a way that there are no thread issues or empty entries errors (patch_config)
+
+    #Obtains the provided config path
     config_path = get_full_config_path(config_path, configs_dir)
+
+    #This initializing and compose is called locally, only within this function
+
     # If get_config is called from different threads, Hydra might
     # get initialized twice leading to issues. This lock fixes it.
     with lock, initialize_config_dir(

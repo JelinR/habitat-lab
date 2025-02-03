@@ -83,7 +83,7 @@ class SingleAgentAccessMgr(AgentAccessMgr):
         self._init_policy_and_updater(lr_schedule_fn, resume_state)
 
     def _init_policy_and_updater(self, lr_schedule_fn, resume_state):
-        self._actor_critic = self._create_policy()
+        self._actor_critic = self._create_policy()      #TODO: Checkpoint - Creates policy
         self._updater = self._create_updater(self._actor_critic)
 
         if self._updater.optimizer is None:
@@ -179,12 +179,13 @@ class SingleAgentAccessMgr(AgentAccessMgr):
                 find_unused_params=find_unused_params
             )
 
+
     def _create_policy(self) -> NetPolicy:
         """
         Creates and initializes the policy. This should also load any model weights from checkpoints.
         """
 
-        policy = baseline_registry.get_policy(
+        policy = baseline_registry.get_policy(      #TODO: Checkpoint - This is where the policy is loaded
             self._config.habitat_baselines.rl.policy[self.agent_name].name
         )
         if policy is None:
